@@ -28,6 +28,7 @@ and machine learning models. Use the sidebar to navigate through different analy
 @st.cache_data
 def load_data():
     df = pd.read_csv('machine_downtime.csv')
+    df['Date'] = pd.to_datetime(df['Date'])
     return df
 
 # Load data
@@ -51,6 +52,14 @@ if page == "Data Overview":
     with col3:
         st.metric("Assembly Lines", df['Assembly_Line_No'].nunique())
     
+    # Date range
+    st.subheader("Data Time Range")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Start Date", df['Date'].min().strftime('%Y-%m-%d'))
+    with col2:
+        st.metric("End Date", df['Date'].max().strftime('%Y-%m-%d'))
+    
     # Show sample data
     st.subheader("Sample Data")
     st.dataframe(df.head())
@@ -62,7 +71,15 @@ if page == "Data Overview":
     # Distribution of machine downtime
     st.subheader("Distribution of Machine Downtime")
     fig = px.pie(df, names='Downtime', title='Distribution of Machine Downtime')
-    st.plotly_chart(fig)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Downtime by assembly line
+    st.subheader("Downtime by Assembly Line")
+    downtime_by_line = df.groupby(['Assembly_Line_No', 'Downtime']).size().unstack()
+    fig = px.bar(downtime_by_line, 
+                 title='Machine Downtime Distribution by Assembly Line',
+                 barmode='group')
+    st.plotly_chart(fig, use_container_width=True)
 
 elif page == "Exploratory Analysis":
     st.header("Exploratory Analysis")
@@ -76,26 +93,46 @@ elif page == "Exploratory Analysis":
     fig = px.imshow(corr, 
                     title="Feature Correlation Heatmap",
                     color_continuous_scale='RdBu_r')
-    st.plotly_chart(fig)
+    st.plotly_chart(fig, use_container_width=True)
     
     # Feature distributions
     st.subheader("Feature Distributions")
-    feature = st.selectbox("Select Feature", numerical_cols)
+    col1, col2 = st.columns(2)
+    with col1:
+        feature = st.selectbox("Select Feature", numerical_cols)
+    with col2:
+        bin_count = st.slider("Number of bins", min_value=10, max_value=100, value=30)
     
     fig = px.histogram(df, x=feature, color='Downtime',
                       title=f"Distribution of {feature} by Downtime Status",
+                      nbins=bin_count,
                       marginal="box")
-    st.plotly_chart(fig)
+    st.plotly_chart(fig, use_container_width=True)
     
     # Time series analysis
     st.subheader("Machine Status Over Time")
-    df['Date'] = pd.to_datetime(df['Date'])
-    daily_failures = df[df['Downtime'] == 'Machine_Failure'].groupby('Date').size().reset_index()
+    # Resample data by day
+    daily_failures = df[df['Downtime'] == 'Machine_Failure'].groupby(
+        pd.Grouper(key='Date', freq='D')
+    ).size().reset_index()
     daily_failures.columns = ['Date', 'Failures']
     
     fig = px.line(daily_failures, x='Date', y='Failures',
                   title='Machine Failures Over Time')
-    st.plotly_chart(fig)
+    fig.update_traces(line_color='red')
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Machine-wise analysis
+    st.subheader("Machine-wise Analysis")
+    machine_stats = df.groupby('Machine_ID').agg({
+        'Downtime': lambda x: (x == 'Machine_Failure').mean(),
+        'Hydraulic_Pressure(bar)': 'mean',
+        'Coolant_Temperature': 'mean',
+        'Spindle_Vibration': 'mean'
+    }).round(3)
+    machine_stats.columns = ['Failure Rate', 'Avg Hydraulic Pressure', 
+                           'Avg Coolant Temp', 'Avg Spindle Vibration']
+    st.dataframe(machine_stats)
 
 elif page == "Machine Learning Models":
     st.header("Machine Learning Models")
@@ -129,7 +166,7 @@ elif page == "Machine Learning Models":
             
             categorical_pipeline = Pipeline([
                 ('imputer', SimpleImputer(strategy='most_frequent')),
-                ('encoder', OneHotEncoder(handle_unknown='ignore'))
+                ('encoder', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
             ])
             
             preprocessor = ColumnTransformer([
@@ -172,7 +209,8 @@ elif page == "Machine Learning Models":
                 cm = confusion_matrix(y_test, y_pred)
                 fig = px.imshow(cm, 
                               labels=dict(x="Predicted", y="Actual"),
-                              title="Confusion Matrix")
+                              title="Confusion Matrix",
+                              color_continuous_scale='RdBu')
                 st.plotly_chart(fig)
             
             # ROC Curve
@@ -193,22 +231,28 @@ elif page == "Machine Learning Models":
             if hasattr(pipeline.named_steps['classifier'], 'feature_importances_'):
                 importances = pipeline.named_steps['classifier'].feature_importances_
             elif hasattr(pipeline.named_steps['classifier'], 'coef_'):
-                importances = np.abs(pipeline.named_steps['classifier'].coef_[0])
+                # For logistic regression, normalize the coefficients
+                coef = pipeline.named_steps['classifier'].coef_[0]
+                importances = np.abs(coef) / np.sum(np.abs(coef))  # Normalize to sum to 1
             
             # Get feature names after preprocessing
-            feature_names = (list(numerical_features) + 
-                           list(categorical_features))
+            cat_feature_names = pipeline.named_steps['preprocessor'].named_transformers_['categorical'].get_feature_names_out(categorical_features)
+            feature_names = list(numerical_features) + list(cat_feature_names)
             
-            importance_df = pd.DataFrame({
-                'feature': feature_names,
-                'importance': importances
-            }).sort_values('importance', ascending=False)
-            
-            st.subheader("Feature Importance")
-            fig = px.bar(importance_df, x='importance', y='feature',
-                        title='Feature Importance',
-                        orientation='h')
-            st.plotly_chart(fig)
+            # Ensure lengths match
+            if len(feature_names) == len(importances):
+                importance_df = pd.DataFrame({
+                    'feature': feature_names,
+                    'importance': importances
+                }).sort_values('importance', ascending=False)
+                
+                st.subheader("Feature Importance")
+                fig = px.bar(importance_df.head(10), x='importance', y='feature',
+                            title='Top 10 Most Important Features',
+                            orientation='h')
+                st.plotly_chart(fig)
+            else:
+                st.warning("Feature importance visualization unavailable due to dimensionality mismatch")
 
 # Add footer
 st.markdown("""
