@@ -1,3 +1,4 @@
+
 streamlit
 pandas
 numpy
@@ -5,3 +6,11 @@ plotly
 scikit-learn
 seaborn
 matplotlib
+
+streamlit
+pandas
+numpy
+plotly
+scikit-learn
+seaborn
+
