@@ -1,4 +1,4 @@
-# A predictive maintenance web application that analyzes manufacturing equipment sensor data to prevent machine downtime.
+## A predictive maintenance web application that analyzes manufacturing equipment sensor data to prevent machine downtime.
 
 [Live Demo](https://machinedowntimeapp-adtcbtmrethr5hkvejjc4v.streamlit.app/) | [Documentation](https://rezo0o.notion.site/Predicting-Industrial-Machine-Downtime-165ef65955e88155b816e08dfdb05faf)
 
