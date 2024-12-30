@@ -32,4 +32,4 @@
 
 [MIT License](LICENSE)
 
-For detailed documentation and implementation details, visit our [Notion Documentation](https://rezo0o.notion.site/Predicting-Industrial-Machine-Downtime-165ef65955e88155b816e08dfdb05faf).
+For detailed documentation and implementation details, visit my [Notion Documentation](https://rezo0o.notion.site/Predicting-Industrial-Machine-Downtime-165ef65955e88155b816e08dfdb05faf).
