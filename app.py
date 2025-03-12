@@ -176,28 +176,35 @@ elif page == "Exploratory Analysis":
     
     # Machine-wise analysis with detailed statistics
     st.subheader("Machine-wise Analysis")
+    
+    # Basic machine statistics calculation
     machine_stats = df.groupby('Machine_ID').agg({
-        'Downtime': lambda x: (x == 'Machine_Failure').mean(),
-        'Hydraulic_Pressure(bar)': ['mean', 'std'],
-        'Coolant_Temperature': ['mean', 'std'],
-        'Spindle_Vibration': ['mean', 'std'],
-        'Tool_Vibration': ['mean', 'std']
+        'Downtime': lambda x: (x == 'Machine_Failure').mean()
     }).round(3)
     
-    # Flatten the multi-index columns for better display
-    machine_stats.columns = [f"{col[0]}_{col[1]}" if col[1] != "" else col[0] 
-                           for col in machine_stats.columns]
+    # Rename for clarity - using a simpler approach to avoid multi-index issues
+    machine_stats.columns = ['Failure_Rate']
     
-    # Rename columns for clarity
-    machine_stats = machine_stats.rename(columns={'Downtime_<lambda_0>': 'Failure_Rate'})
+    # Add more statistics in a more direct way to avoid multi-index complexity
+    for col in ['Hydraulic_Pressure(bar)', 'Coolant_Temperature', 'Spindle_Vibration', 'Tool_Vibration']:
+        machine_stats[f'{col}_mean'] = df.groupby('Machine_ID')[col].mean().round(3)
+        machine_stats[f'{col}_std'] = df.groupby('Machine_ID')[col].std().round(3)
     
+    # Display the statistics table
     st.dataframe(machine_stats)
     
+    # Prepare data for visualization (reset index to make Machine_ID a column)
+    plot_data = machine_stats.reset_index()
+    
     # Visualize machine failure rates
-    fig = px.bar(machine_stats.reset_index(), x='Machine_ID', y='Failure_Rate',
-                title='Machine Failure Rates',
-                color='Failure_Rate',
-                color_continuous_scale='Reds')
+    fig = px.bar(
+        plot_data, 
+        x='Machine_ID', 
+        y='Failure_Rate',
+        title='Machine Failure Rates',
+        color='Failure_Rate',
+        color_continuous_scale='Reds'
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 # Machine Learning Models page
